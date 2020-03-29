@@ -1,0 +1,86 @@
+<?php
+
+//require_once 'vendor/autoload.php';
+
+function setCache($content, $casheId)
+{
+    if ($content == '') {
+        return;
+    }
+    if ($content != '') {
+        $fileName = 'cash/' . md5($casheId) . '.html';
+        if (!file_exists('cash')) {
+            mkdir('cash');
+        }
+        $f = fopen($fileName, 'w+');
+        fwrite($f, $content);
+        fclose($f);
+    }
+}
+
+//
+function getCache($casheId, $cashExpired = true, &$fileName = '')
+{
+    if (!$cashExpired) {
+        return;
+    }
+    $fileName = 'cash/' . md5($casheId) . '.html';
+    if (file_exists($fileName)) {
+        return false;
+    }
+    $time = time() - filemtime($fileName);
+    if ($time > $cashExpired) {
+        return false;
+    }
+    return file_get_contents($fileName);
+}
+
+// для загрузки контента с url
+function curlLoad($url, $cash = 0)
+{
+    $cacheId = md5($url);
+    if ($content = getCache($cacheId, $cash)) {
+//        var_dump(1); exit();
+        return $content;
+    }
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
+    $content = curl_exec($ch);
+    curl_close($ch);
+
+    setCache($content, $cacheId, $cash);
+    return $content;
+}
+
+$url = 'https://korshop.ru/catalog/ris_lapsha/';
+$content = curlLoad($url, $cash = 3600);
+//var_dump(strlen($content)); // объем контента
+
+
+// функция preg_match ищет в $content строку с дивами и сохраняет в массив $a  и все складывает в 0, т.е. $a[0] ;
+// в единичку складывает первую скобку т.е. preg_match('~(<div class="showcase clearfix" id="showcaseview">).*?<div class="ajaxpages showcase">~is', $content, $a);
+// echo htmlspecialchars($a[1]); резултат будет = div class="showcase clearfix" id="showcaseview
+
+
+preg_match('~<div class="showcase clearfix" id="showcaseview">.*?<div class="ajaxpages showcase">~is', $content, $a); // извлекаем кусок контента необходимый для парсинга
+//i - регистро независимый поиск, s - для того что бы попали и переносы строк ? - ищет до ближайщего совпабения со следующей строкой
+
+$innerContent = $a[0];
+// находим множество подстрок preg_match_all
+preg_match_all('~<div class="js-element.*?</div>\s*</div>\s*</div>\s*</div>~is', $content, $rows); //s* - всякое количество пробелов, всякий мусор, заменяется на s*
+//var_dump(count($a[0]));
+
+foreach($rows[0] as $rowContent) {
+    echo htmlspecialchars($rowContent);
+    preg_match('~<title>.*?~i', $rowContent, $a);
+    $name = $a[1];
+    echo '<br />'. $name;
+    exit;
+}
+
+
+//echo htmlspecialchars($a[0]);
+
